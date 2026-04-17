@@ -46,7 +46,7 @@ DISCORD_NOTIFY_KEY=<向管理員索取>
 
 | 欄位 | 型別 | 必填 | 說明 |
 |------|------|------|------|
-| `channel` | string | ✅ | 頻道別名，必須是 `/channels` 清單中的 key |
+| `channel` | string | ✅ | 頻道別名，必須是 `/channels` 清單中的 key（**不分大小寫**） |
 | `title` | string | ✅ | 通知標題（會加上等級 emoji） |
 | `level` | string |  | `info`（預設）/ `success` / `warning` / `error` / `critical` |
 | `message` | string |  | 詳細內容，支援 Markdown |
@@ -253,7 +253,7 @@ async function safeNotify(body) {
 
 ## 新增 / 修改頻道
 
-1. 請管理員編輯伺服器上的 `channels.json`
+1. 請管理員編輯伺服器上的 `config/channels.json`
 2. 存檔後**自動熱重載**，不需重啟服務
 3. 呼叫 `GET /channels` 確認新 alias 已出現
 

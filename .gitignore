@@ -1,6 +1,7 @@
 node_modules/
 .env
 channels.json
+config/channels.json
 npm-debug.log*
 .DS_Store
 coverage/

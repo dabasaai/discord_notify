@@ -1,0 +1,4 @@
+{
+  "nfc": { "channelId": "123456789012345678", "label": "NFC" },
+  "contreeshop": { "channelId": "987654321098765432", "label": "ContreeShop" }
+}

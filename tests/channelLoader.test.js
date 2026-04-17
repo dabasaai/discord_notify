@@ -41,6 +41,28 @@ test('解析失敗時保留前一份設定', async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+test('alias 不分大小寫', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cn-'));
+  const file = path.join(dir, 'channels.json');
+  await writeFile(file, JSON.stringify({ NFC: { channelId: '7' } }));
+  const loader = new ChannelLoader(file, { logger: silentLogger });
+  await loader.load();
+  assert.equal(loader.get('nfc').channelId, '7');
+  assert.equal(loader.get('NFC').channelId, '7');
+  assert.equal(loader.get('Nfc').channelId, '7');
+  assert.equal(loader.list()[0].alias, 'NFC', '保留原始大小寫顯示');
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('大小寫重複的 alias 視為衝突', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cn-'));
+  const file = path.join(dir, 'channels.json');
+  await writeFile(file, JSON.stringify({ NFC: { channelId: '1' }, nfc: { channelId: '2' } }));
+  const loader = new ChannelLoader(file, { logger: silentLogger });
+  await assert.rejects(() => loader.load(), /duplicate/);
+  await rm(dir, { recursive: true, force: true });
+});
+
 test('chokidar 熱重載變更', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'cn-'));
   const file = path.join(dir, 'channels.json');

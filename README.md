@@ -15,9 +15,9 @@
 
 ```bash
 cp .env.example .env
-cp channels.example.json channels.json
+cp config/channels.example.json config/channels.json
 # 填入 .env 的 DISCORD_BOT_TOKEN 與 API_KEY
-# 編輯 channels.json 填入實際的 Discord Channel ID
+# 編輯 config/channels.json 填入實際的 Discord Channel ID
 
 docker compose up -d --build
 curl http://127.0.0.1:3020/health
@@ -32,7 +32,7 @@ curl http://127.0.0.1:3020/health
 | `DISCORD_BOT_TOKEN` | ✅ | Bot Token（需 `Send Messages` + `Embed Links` 權限） |
 | `API_KEY` | ✅ | 呼叫方需在 `x-api-key` header 帶入 |
 | `PORT` | | 容器內監聽 port，預設 `3020` |
-| `CHANNELS_FILE` | | channels.json 路徑，預設 `/app/channels.json` |
+| `CHANNELS_FILE` | | channels.json 路徑，預設 `/app/config/channels.json` |
 | `ALERT_COMMAND` | | Bot 斷線時執行的指令，例如 `tg-notify`。留空則只寫 log |
 
 ## API
@@ -84,16 +84,18 @@ curl -X POST https://d_notify.contree.app/notify \
 
 ## 頻道管理
 
-編輯 `channels.json`：
+編輯 `config/channels.json`（容器掛載此目錄）：
 
 ```json
 {
-  "deploy": { "channelId": "123456789012345678", "label": "部署紀錄" },
-  "error":  { "channelId": "987654321098765432", "label": "錯誤警報" }
+  "nfc":         { "channelId": "123456789012345678", "label": "NFC" },
+  "contreeshop": { "channelId": "987654321098765432", "label": "ContreeShop" }
 }
 ```
 
 存檔後自動重載，不需重啟容器。若 JSON 格式錯誤，服務會保留前一份有效設定並在 log 提示。
+
+**alias 不分大小寫** — `"nfc"` / `"NFC"` / `"Nfc"` 都會路由到同一頻道。
 
 **Bot 權限**：邀請 Bot 進伺服器時，只需 `Send Messages` + `Embed Links`。
 
@@ -133,7 +135,7 @@ dn deploy "備份完成" -f "筆數=12340:inline" -f "耗時=45s:inline"
 ```bash
 npm install
 npm test            # 跑單元 + 整合測試
-npm run dev         # 本機啟動（需 .env 與 channels.json）
+npm run dev         # 本機啟動（需 .env 與 config/channels.json）
 ```
 
 ## 擴充方向

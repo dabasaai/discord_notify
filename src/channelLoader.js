@@ -16,7 +16,15 @@ export class ChannelLoader extends EventEmitter {
       const raw = await readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(raw);
       this.#validate(parsed);
-      this.channels = parsed;
+      const normalized = {};
+      for (const [alias, val] of Object.entries(parsed)) {
+        const key = alias.toLowerCase();
+        if (key in normalized) {
+          throw new Error(`duplicate channel alias (case-insensitive): "${alias}"`);
+        }
+        normalized[key] = { ...val, originalAlias: alias };
+      }
+      this.channels = normalized;
       this.emit('loaded', this.channels);
       return this.channels;
     } catch (err) {
@@ -48,12 +56,13 @@ export class ChannelLoader extends EventEmitter {
   }
 
   get(alias) {
-    return this.channels[alias];
+    if (typeof alias !== 'string') return undefined;
+    return this.channels[alias.toLowerCase()];
   }
 
   list() {
-    return Object.entries(this.channels).map(([alias, v]) => ({
-      alias,
+    return Object.values(this.channels).map((v) => ({
+      alias: v.originalAlias,
       channelId: v.channelId,
       label: v.label,
     }));
