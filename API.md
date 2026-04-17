@@ -8,8 +8,8 @@
 
 | 項目 | 值 |
 |------|------|
-| Base URL（對外） | `https://d_notify.contree.app` |
-| Base URL（內網） | `https://d_notify.contree.app` |
+| Base URL（對外） | `https://dn.contree.app` |
+| Base URL（內網） | `https://dn.contree.app` |
 | 認證方式 | HTTP Header `x-api-key`（`/health` 除外） |
 | Content-Type | `application/json` |
 | 字元限制 | title ≤ 256、message ≤ 4000、fields ≤ 25 個、每個 field value ≤ 1024 |
@@ -24,7 +24,7 @@
 
 ```bash
 # ~/your-service/.env
-DISCORD_NOTIFY_URL=https://d_notify.contree.app
+DISCORD_NOTIFY_URL=https://dn.contree.app
 DISCORD_NOTIFY_KEY=<向管理員索取>
 ```
 
@@ -77,7 +77,7 @@ DISCORD_NOTIFY_KEY=<向管理員索取>
 用來確認目前有哪些 alias 可用。
 
 ```bash
-curl https://d_notify.contree.app/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
+curl https://dn.contree.app/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
 ```
 
 **回應**
@@ -97,7 +97,7 @@ curl https://d_notify.contree.app/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
 不需認證，適合給 oncall / 監控系統用。
 
 ```bash
-curl https://d_notify.contree.app/health
+curl https://dn.contree.app/health
 ```
 
 ```json
@@ -113,7 +113,7 @@ curl https://d_notify.contree.app/health
 ### curl
 
 ```bash
-curl -X POST https://d_notify.contree.app/notify \
+curl -X POST https://dn.contree.app/notify \
   -H "x-api-key: $DISCORD_NOTIFY_KEY" \
   -H "Content-Type: application/json" \
   -d '{

@@ -23,7 +23,7 @@ docker compose up -d --build
 curl http://127.0.0.1:3020/health
 ```
 
-> 已部署：對外端點 `https://d_notify.contree.app`（frpc + Caddy 轉發）
+> 已部署：對外端點 `https://dn.contree.app`（frpc + Caddy 轉發）
 
 ## 環境變數
 
@@ -42,7 +42,7 @@ curl http://127.0.0.1:3020/health
 發送通知。需 `x-api-key` header。
 
 ```bash
-curl -X POST https://d_notify.contree.app/notify \
+curl -X POST https://dn.contree.app/notify \
   -H "x-api-key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
