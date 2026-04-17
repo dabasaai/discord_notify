@@ -8,8 +8,8 @@
 
 | 項目 | 值 |
 |------|------|
-| Base URL（內網） | `http://127.0.0.1:3020` |
-| Base URL（對外） | 由 frpc 轉發後的 `http://<你的對外位址>:<port>` |
+| Base URL（對外） | `https://d_notify.contree.app` |
+| Base URL（內網） | `https://d_notify.contree.app` |
 | 認證方式 | HTTP Header `x-api-key`（`/health` 除外） |
 | Content-Type | `application/json` |
 | 字元限制 | title ≤ 256、message ≤ 4000、fields ≤ 25 個、每個 field value ≤ 1024 |
@@ -24,7 +24,7 @@
 
 ```bash
 # ~/your-service/.env
-DISCORD_NOTIFY_URL=http://127.0.0.1:3020
+DISCORD_NOTIFY_URL=https://d_notify.contree.app
 DISCORD_NOTIFY_KEY=<向管理員索取>
 ```
 
@@ -77,7 +77,7 @@ DISCORD_NOTIFY_KEY=<向管理員索取>
 用來確認目前有哪些 alias 可用。
 
 ```bash
-curl http://127.0.0.1:3020/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
+curl https://d_notify.contree.app/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
 ```
 
 **回應**
@@ -97,7 +97,7 @@ curl http://127.0.0.1:3020/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
 不需認證，適合給 oncall / 監控系統用。
 
 ```bash
-curl http://127.0.0.1:3020/health
+curl https://d_notify.contree.app/health
 ```
 
 ```json
@@ -113,7 +113,7 @@ curl http://127.0.0.1:3020/health
 ### curl
 
 ```bash
-curl -X POST http://127.0.0.1:3020/notify \
+curl -X POST https://d_notify.contree.app/notify \
   -H "x-api-key: $DISCORD_NOTIFY_KEY" \
   -H "Content-Type: application/json" \
   -d '{
