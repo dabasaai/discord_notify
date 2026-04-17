@@ -1,0 +1,6 @@
+node_modules/
+.env
+channels.json
+npm-debug.log*
+.DS_Store
+coverage/

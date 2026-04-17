@@ -1,0 +1,24 @@
+{
+  "name": "discord-notify",
+  "version": "1.0.0",
+  "description": "Internal HTTP API for sending notifications to Discord channels via a shared bot.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test 'tests/**/*.test.js'"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "discord.js": "^14.26.2",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0"
+  }
+}
