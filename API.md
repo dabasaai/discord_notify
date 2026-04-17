@@ -8,8 +8,7 @@
 
 | 項目 | 值 |
 |------|------|
-| Base URL（對外） | `https://dn.contree.app` |
-| Base URL（內網） | `https://dn.contree.app` |
+| Base URL | 由管理員提供（內部服務，不公開於文件） |
 | 認證方式 | HTTP Header `x-api-key`（`/health` 除外） |
 | Content-Type | `application/json` |
 | 字元限制 | title ≤ 256、message ≤ 4000、fields ≤ 25 個、每個 field value ≤ 1024 |
@@ -24,7 +23,7 @@
 
 ```bash
 # ~/your-service/.env
-DISCORD_NOTIFY_URL=https://dn.contree.app
+DISCORD_NOTIFY_URL=<向管理員索取>
 DISCORD_NOTIFY_KEY=<向管理員索取>
 ```
 
@@ -58,7 +57,7 @@ DISCORD_NOTIFY_KEY=<向管理員索取>
 
 **成功 `200`**
 ```json
-{ "ok": true, "messageId": "1494595458084114533", "channel": "deploy" }
+{ "ok": true, "messageId": "1234567890123456789", "channel": "alpha" }
 ```
 
 **失敗**
@@ -77,15 +76,15 @@ DISCORD_NOTIFY_KEY=<向管理員索取>
 用來確認目前有哪些 alias 可用。
 
 ```bash
-curl https://dn.contree.app/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
+curl $DISCORD_NOTIFY_URL/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
 ```
 
 **回應**
 ```json
 {
   "channels": [
-    { "alias": "deploy", "channelId": "1494595000401399849", "label": "部署紀錄" },
-    { "alias": "error",  "channelId": "1494594901357363362", "label": "錯誤警報" }
+    { "alias": "alpha", "channelId": "111111111111111111", "label": "範例頻道 A" },
+    { "alias": "beta",  "channelId": "222222222222222222", "label": "範例頻道 B" }
   ]
 }
 ```
@@ -97,7 +96,7 @@ curl https://dn.contree.app/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
 不需認證，適合給 oncall / 監控系統用。
 
 ```bash
-curl https://dn.contree.app/health
+curl $DISCORD_NOTIFY_URL/health
 ```
 
 ```json
@@ -113,11 +112,11 @@ curl https://dn.contree.app/health
 ### curl
 
 ```bash
-curl -X POST https://dn.contree.app/notify \
+curl -X POST $DISCORD_NOTIFY_URL/notify \
   -H "x-api-key: $DISCORD_NOTIFY_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "channel": "deploy",
+    "channel": "alpha",
     "title": "api v1.2.3 部署完成",
     "level": "success",
     "message": "生產環境已更新，健康檢查通過",
@@ -146,7 +145,7 @@ async function notify(body) {
 }
 
 await notify({
-  channel: 'error',
+  channel: 'beta',
   title: 'API 回應異常',
   level: 'error',
   message: `DB 連線 timeout: ${err.message}`,
@@ -171,7 +170,7 @@ def notify(payload):
     return r.json()
 
 notify({
-    "channel": "deploy",
+    "channel": "alpha",
     "title": "批次任務完成",
     "level": "success",
     "service": "daily-report",
@@ -190,9 +189,9 @@ notify() {
 }
 
 if ./deploy.sh; then
-  notify '{"channel":"deploy","title":"部署完成","level":"success","service":"'"$HOSTNAME"'"}'
+  notify '{"channel":"alpha","title":"部署完成","level":"success","service":"'"$HOSTNAME"'"}'
 else
-  notify '{"channel":"error","title":"部署失敗","level":"error","service":"'"$HOSTNAME"'","mention":"@here"}'
+  notify '{"channel":"beta","title":"部署失敗","level":"error","service":"'"$HOSTNAME"'","mention":"@here"}'
 fi
 ```
 

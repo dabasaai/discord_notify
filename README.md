@@ -23,8 +23,6 @@ docker compose up -d --build
 curl http://127.0.0.1:3020/health
 ```
 
-> 已部署：對外端點 `https://dn.contree.app`（frpc + Caddy 轉發）
-
 ## 環境變數
 
 | 變數 | 必填 | 說明 |
@@ -42,11 +40,11 @@ curl http://127.0.0.1:3020/health
 發送通知。需 `x-api-key` header。
 
 ```bash
-curl -X POST https://dn.contree.app/notify \
+curl -X POST "$NOTIFY_URL/notify" \
   -H "x-api-key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "channel": "deploy",
+    "channel": "your-channel",
     "title": "部署完成",
     "level": "success",
     "message": "api v1.2.3 已上線",
@@ -119,13 +117,13 @@ remote_port = 3020
 # 安裝（把腳本連結到 PATH）
 ln -s "$(pwd)/scripts/dn" ~/.local/bin/dn
 
-# 使用
-dn --health                              # 健康檢查
-dn --list                                # 列出頻道
-dn deploy "部署完成" "v1.2.3" -l success -s ci
-./build.sh && dn deploy "Build OK" -l success || dn error "Build Fail" -l error -m "@here"
-tail -100 /var/log/app.log | dn error "錯誤" --stdin -l error
-dn deploy "備份完成" -f "筆數=12340:inline" -f "耗時=45s:inline"
+# 使用（channel 依 config/channels.json 登記的 alias）
+dn --health                                         # 健康檢查
+dn --list                                           # 列出頻道
+dn <channel> "部署完成" "v1.2.3" -l success -s ci
+./build.sh && dn <channel> "Build OK" -l success || dn <channel> "Build Fail" -l error -m "@here"
+tail -100 /var/log/app.log | dn <channel> "錯誤" --stdin -l error
+dn <channel> "備份完成" -f "筆數=12340:inline" -f "耗時=45s:inline"
 ```
 
 腳本會自動從當前目錄或專案根的 `.env` 讀取 `DISCORD_NOTIFY_KEY`（或 `API_KEY`）和 `DISCORD_NOTIFY_URL`。詳見 `dn --help`。
