@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+# dn — discord-notify CLI
+# 快速從命令列或 shell script 發送通知到 Discord
+#
+# 用法：
+#   dn <channel> <title> [message] [options]
+#   echo "log..." | dn <channel> <title> -l error --stdin
+#
+# 需要環境變數：
+#   DISCORD_NOTIFY_URL  預設 http://127.0.0.1:3020
+#   DISCORD_NOTIFY_KEY  必填（API Key）
+#
+# 若同目錄有 .env 會自動載入這兩個變數。
+
+set -euo pipefail
+
+# ---------- 自動載入 .env（優先順序：現有環境 > ./.env > 腳本所在目錄/.env） ----------
+load_env_file() {
+  local f="$1" line key val
+  [[ -r "$f" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    [[ "$line" != *=* ]] && continue
+    key="${line%%=*}"
+    val="${line#*=}"
+    key="${key// /}"
+    val="${val%\"}"; val="${val#\"}"
+    if [[ "$key" == "DISCORD_NOTIFY_URL" && -z "${DISCORD_NOTIFY_URL:-}" ]]; then
+      export DISCORD_NOTIFY_URL="$val"
+    elif [[ "$key" == "DISCORD_NOTIFY_KEY" && -z "${DISCORD_NOTIFY_KEY:-}" ]]; then
+      export DISCORD_NOTIFY_KEY="$val"
+    elif [[ "$key" == "API_KEY" && -z "${DISCORD_NOTIFY_KEY:-}" ]]; then
+      export DISCORD_NOTIFY_KEY="$val"
+    fi
+  done < "$f"
+  return 0
+}
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+load_env_file "./.env"
+load_env_file "$SCRIPT_DIR/../.env"
+
+: "${DISCORD_NOTIFY_URL:=http://127.0.0.1:3020}"
+
+usage() {
+  cat <<'EOF'
+dn — discord-notify CLI
+
+用法：
+  dn <channel> <title> [message] [options]
+  echo "..." | dn <channel> <title> --stdin [options]
+
+參數：
+  <channel>           頻道別名（見 dn --list）
+  <title>             通知標題
+  [message]           訊息內容（可選；或用 --stdin 從標準輸入讀）
+
+選項：
+  -l, --level LEVEL   info(預設) | success | warning | error | critical
+  -s, --service NAME  發送方名稱（顯示於 footer）
+  -m, --mention AT    mention，如 "@here" 或 "<@USER_ID>"
+  -f, --field K=V     額外欄位（可重複）；加 :inline 使其橫排，例：-f "Branch=main:inline"
+      --stdin         從標準輸入讀 message
+      --list          列出可用頻道
+      --health        健康檢查
+  -u, --url URL       覆寫 DISCORD_NOTIFY_URL
+  -q, --quiet         只輸出錯誤，不印成功回應
+  -h, --help          顯示此說明
+
+環境變數：
+  DISCORD_NOTIFY_URL  API base URL（預設 http://127.0.0.1:3020）
+  DISCORD_NOTIFY_KEY  API Key（必填，可從 ./.env 自動載入）
+
+範例：
+  dn deploy "部署完成" "v1.2.3" -l success -s ci-runner
+  ./build.sh && dn deploy "Build OK" -l success || dn error "Build Fail" -l error -m "@here"
+  tail -100 /var/log/app.log | dn error "服務錯誤" --stdin -l error
+  dn deploy "每日備份" -f "筆數=12340:inline" -f "耗時=45s:inline"
+
+退出碼：
+  0  成功
+  1  使用方式錯誤
+  2  未設定 DISCORD_NOTIFY_KEY
+  3  缺少必要工具（curl / jq）
+  4  HTTP 呼叫失敗
+EOF
+}
+
+# ---------- 依賴檢查 ----------
+for bin in curl jq; do
+  command -v "$bin" >/dev/null 2>&1 || { echo "錯誤：需要 '$bin'，請先安裝" >&2; exit 3; }
+done
+
+# ---------- 參數解析 ----------
+LEVEL="info"
+SERVICE=""
+MENTION=""
+FIELDS=()
+USE_STDIN=0
+ACTION="notify"
+QUIET=0
+POSITIONAL=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -l|--level)   LEVEL="$2"; shift 2 ;;
+    -s|--service) SERVICE="$2"; shift 2 ;;
+    -m|--mention) MENTION="$2"; shift 2 ;;
+    -f|--field)   FIELDS+=("$2"); shift 2 ;;
+    --stdin)      USE_STDIN=1; shift ;;
+    --list)       ACTION="list"; shift ;;
+    --health)     ACTION="health"; shift ;;
+    -u|--url)     DISCORD_NOTIFY_URL="$2"; shift 2 ;;
+    -q|--quiet)   QUIET=1; shift ;;
+    -h|--help)    usage; exit 0 ;;
+    --)           shift; while [[ $# -gt 0 ]]; do POSITIONAL+=("$1"); shift; done ;;
+    -*)           echo "未知選項：$1" >&2; exit 1 ;;
+    *)            POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
+# ---------- 共用 curl 函式 ----------
+require_key() {
+  [[ -n "${DISCORD_NOTIFY_KEY:-}" ]] || {
+    echo "錯誤：未設定 DISCORD_NOTIFY_KEY（匯出環境變數或放入 .env）" >&2
+    exit 2
+  }
+}
+
+call_api() {
+  local method="$1" path="$2" body="${3:-}"
+  local args=(-sS -w '\n%{http_code}' -X "$method" "$DISCORD_NOTIFY_URL$path")
+  [[ "$path" != "/health" ]] && args+=(-H "x-api-key: $DISCORD_NOTIFY_KEY")
+  if [[ -n "$body" ]]; then
+    args+=(-H "Content-Type: application/json" --data-binary "$body")
+  fi
+  curl "${args[@]}"
+}
+
+# ---------- list / health ----------
+if [[ "$ACTION" == "list" ]]; then
+  require_key
+  out="$(call_api GET /channels)"
+  code="$(tail -n1 <<<"$out")"
+  body="$(sed '$d' <<<"$out")"
+  [[ "$code" == "200" ]] || { echo "$body" >&2; exit 4; }
+  jq -r '.channels[] | "\(.alias)\t\(.label // "")\t\(.channelId)"' <<<"$body" |
+    column -t -s $'\t'
+  exit 0
+fi
+
+if [[ "$ACTION" == "health" ]]; then
+  out="$(call_api GET /health)"
+  code="$(tail -n1 <<<"$out")"
+  body="$(sed '$d' <<<"$out")"
+  [[ "$code" == "200" ]] || { echo "$body" >&2; exit 4; }
+  jq . <<<"$body"
+  exit 0
+fi
+
+# ---------- notify ----------
+[[ ${#POSITIONAL[@]} -ge 2 ]] || { usage >&2; exit 1; }
+CHANNEL="${POSITIONAL[0]}"
+TITLE="${POSITIONAL[1]}"
+MESSAGE="${POSITIONAL[2]:-}"
+
+if [[ $USE_STDIN -eq 1 ]]; then
+  STDIN_CONTENT="$(cat)"
+  if [[ -n "$MESSAGE" ]]; then
+    MESSAGE="$MESSAGE"$'\n'"$STDIN_CONTENT"
+  else
+    MESSAGE="$STDIN_CONTENT"
+  fi
+fi
+
+case "$LEVEL" in
+  info|success|warning|error|critical) ;;
+  *) echo "錯誤：level 必須是 info|success|warning|error|critical" >&2; exit 1 ;;
+esac
+
+require_key
+
+# 用 jq 組 JSON（自動處理跳脫）
+jq_args=(
+  --arg channel "$CHANNEL"
+  --arg title "$TITLE"
+  --arg level "$LEVEL"
+)
+jq_filter='{channel: $channel, title: $title, level: $level}'
+
+if [[ -n "$MESSAGE" ]]; then
+  jq_args+=(--arg message "$MESSAGE")
+  jq_filter+=' + {message: $message}'
+fi
+if [[ -n "$SERVICE" ]]; then
+  jq_args+=(--arg service "$SERVICE")
+  jq_filter+=' + {service: $service}'
+fi
+if [[ -n "$MENTION" ]]; then
+  jq_args+=(--arg mention "$MENTION")
+  jq_filter+=' + {mention: $mention}'
+fi
+if [[ ${#FIELDS[@]} -gt 0 ]]; then
+  fields_json='['
+  first=1
+  for f in "${FIELDS[@]}"; do
+    inline=false
+    raw="$f"
+    if [[ "$raw" == *:inline ]]; then
+      inline=true
+      raw="${raw%:inline}"
+    fi
+    name="${raw%%=*}"
+    value="${raw#*=}"
+    if [[ "$name" == "$raw" || -z "$name" ]]; then
+      echo "錯誤：--field 格式必須是 name=value（可加 :inline）" >&2
+      exit 1
+    fi
+    item="$(jq -n --arg n "$name" --arg v "$value" --argjson i "$inline" \
+      '{name: $n, value: $v, inline: $i}')"
+    [[ $first -eq 1 ]] && first=0 || fields_json+=','
+    fields_json+="$item"
+  done
+  fields_json+=']'
+  jq_args+=(--argjson fields "$fields_json")
+  jq_filter+=' + {fields: $fields}'
+fi
+
+BODY="$(jq -n "${jq_args[@]}" "$jq_filter")"
+
+out="$(call_api POST /notify "$BODY")"
+code="$(tail -n1 <<<"$out")"
+body="$(sed '$d' <<<"$out")"
+
+if [[ "$code" == "200" ]]; then
+  [[ $QUIET -eq 1 ]] || jq -r '"✅ sent (\(.channel))  messageId=\(.messageId)"' <<<"$body"
+  exit 0
+else
+  echo "❌ HTTP $code" >&2
+  echo "$body" >&2
+  exit 4
+fi

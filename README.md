@@ -107,6 +107,25 @@ local_port = 3020
 remote_port = 3020
 ```
 
+## CLI 腳本
+
+`scripts/dn` 提供命令列快速發送通知，依賴 `curl` + `jq`。
+
+```bash
+# 安裝（把腳本連結到 PATH）
+ln -s "$(pwd)/scripts/dn" ~/.local/bin/dn
+
+# 使用
+dn --health                              # 健康檢查
+dn --list                                # 列出頻道
+dn deploy "部署完成" "v1.2.3" -l success -s ci
+./build.sh && dn deploy "Build OK" -l success || dn error "Build Fail" -l error -m "@here"
+tail -100 /var/log/app.log | dn error "錯誤" --stdin -l error
+dn deploy "備份完成" -f "筆數=12340:inline" -f "耗時=45s:inline"
+```
+
+腳本會自動從當前目錄或專案根的 `.env` 讀取 `DISCORD_NOTIFY_KEY`（或 `API_KEY`）和 `DISCORD_NOTIFY_URL`。詳見 `dn --help`。
+
 ## 開發與測試
 
 ```bash
