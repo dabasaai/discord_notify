@@ -1,4 +1,9 @@
 {
   "nfc": { "channelId": "123456789012345678", "label": "NFC" },
-  "contreeshop": { "channelId": "987654321098765432", "label": "ContreeShop" }
+  "contreeshop": { "channelId": "987654321098765432", "label": "ContreeShop" },
+  "cwkiosk": { "channelId": "111111111111111111", "label": "CWKiosk" },
+  "officialwebsite": { "channelId": "222222222222222222", "label": "OfficialWebsite" },
+  "digitalent_auth": { "channelId": "333333333333333333", "label": "DigitalentAuth" },
+  "vault": { "channelId": "444444444444444444", "label": "Vault" },
+  "certs": { "channelId": "555555555555555555", "label": "Certs" }
 }
