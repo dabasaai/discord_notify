@@ -4,13 +4,16 @@ services:
     image: discord-notify:latest
     container_name: discord-notify
     restart: unless-stopped
+    # 對齊 host ./config 擁有者（ubuntu uid 1001），讓 POST/DELETE /channels 能寫回檔案
+    user: "1001:1001"
     env_file: .env
     environment:
       CHANNELS_FILE: /app/config/channels.json
     ports:
       - "127.0.0.1:${PORT:-3020}:${PORT:-3020}"
     volumes:
-      - ./config:/app/config:ro
+      # 可寫：POST/DELETE /channels 需寫回 channels.json（原子寫入 tmp + rename）
+      - ./config:/app/config
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT||3020) + '/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s

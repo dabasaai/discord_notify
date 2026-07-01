@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ChannelLoader } from '../src/channelLoader.js';
@@ -60,6 +60,67 @@ test('大小寫重複的 alias 視為衝突', async () => {
   await writeFile(file, JSON.stringify({ NFC: { channelId: '1' }, nfc: { channelId: '2' } }));
   const loader = new ChannelLoader(file, { logger: silentLogger });
   await assert.rejects(() => loader.load(), /duplicate/);
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('add 新增頻道並寫回檔案', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cn-'));
+  const file = path.join(dir, 'channels.json');
+  await writeFile(file, JSON.stringify({ a: { channelId: '1' } }));
+  const loader = new ChannelLoader(file, { logger: silentLogger });
+  await loader.load();
+  const created = await loader.add('news', { channelId: '555', label: 'News' });
+  assert.equal(created.channelId, '555');
+  assert.equal(loader.get('news').channelId, '555');
+  const onDisk = JSON.parse(await readFile(file, 'utf8'));
+  assert.equal(onDisk.news.channelId, '555');
+  assert.equal(onDisk.news.label, 'News');
+  assert.equal(onDisk.a.channelId, '1', '保留既有頻道');
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('add 缺 channelId 拒絕', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cn-'));
+  const file = path.join(dir, 'channels.json');
+  await writeFile(file, JSON.stringify({ a: { channelId: '1' } }));
+  const loader = new ChannelLoader(file, { logger: silentLogger });
+  await loader.load();
+  await assert.rejects(() => loader.add('x', {}), /channelId/);
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('add 重複 alias(不分大小寫)拒絕', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cn-'));
+  const file = path.join(dir, 'channels.json');
+  await writeFile(file, JSON.stringify({ News: { channelId: '1' } }));
+  const loader = new ChannelLoader(file, { logger: silentLogger });
+  await loader.load();
+  await assert.rejects(() => loader.add('news', { channelId: '2' }), /already exists/);
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('remove 移除頻道', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cn-'));
+  const file = path.join(dir, 'channels.json');
+  await writeFile(file, JSON.stringify({ a: { channelId: '1' }, News: { channelId: '2' } }));
+  const loader = new ChannelLoader(file, { logger: silentLogger });
+  await loader.load();
+  const removed = await loader.remove('news');
+  assert.equal(removed, true, 'remove 不分大小寫');
+  assert.equal(loader.get('news'), undefined);
+  const onDisk = JSON.parse(await readFile(file, 'utf8'));
+  assert.equal('News' in onDisk, false);
+  assert.equal(onDisk.a.channelId, '1');
+  await rm(dir, { recursive: true, force: true });
+});
+
+test('remove 不存在的頻道回 false', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'cn-'));
+  const file = path.join(dir, 'channels.json');
+  await writeFile(file, JSON.stringify({ a: { channelId: '1' } }));
+  const loader = new ChannelLoader(file, { logger: silentLogger });
+  await loader.load();
+  assert.equal(await loader.remove('nope'), false);
   await rm(dir, { recursive: true, force: true });
 });
 

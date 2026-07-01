@@ -9,6 +9,20 @@ function fakeLoader(map) {
   return {
     get: (a) => map[a],
     list: () => Object.entries(map).map(([alias, v]) => ({ alias, ...v })),
+    add: async (alias, { channelId, label }) => {
+      if (map[alias]) {
+        const e = new Error(`channel alias already exists: "${alias}"`);
+        e.statusCode = 400;
+        throw e;
+      }
+      map[alias] = { channelId, label, originalAlias: alias };
+      return map[alias];
+    },
+    remove: async (alias) => {
+      if (!map[alias]) return false;
+      delete map[alias];
+      return true;
+    },
   };
 }
 
@@ -108,6 +122,92 @@ test('Discord 失敗回 502', async () => {
     .set('x-api-key', 'k')
     .send({ channel: 'x', title: 't' });
   assert.equal(res.status, 502);
+});
+
+test('POST /channels 新增頻道回 201', async () => {
+  const map = {};
+  const app = createApp({
+    bot: fakeBot(),
+    channelLoader: fakeLoader(map),
+    apiKey: 'k',
+    logger: silentLogger,
+  });
+  const res = await request(app)
+    .post('/channels')
+    .set('x-api-key', 'k')
+    .send({ alias: 'news', channelId: '123', label: 'News' });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.channel.alias, 'news');
+  assert.equal(res.body.channel.channelId, '123');
+  assert.equal(map.news.channelId, '123');
+});
+
+test('POST /channels test=true 會發測試訊息', async () => {
+  const app = createApp({
+    bot: fakeBot({ send: async () => ({ id: 'msg-test' }) }),
+    channelLoader: fakeLoader({}),
+    apiKey: 'k',
+    logger: silentLogger,
+  });
+  const res = await request(app)
+    .post('/channels')
+    .set('x-api-key', 'k')
+    .send({ alias: 'news', channelId: '123', test: true });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.test.ok, true);
+  assert.equal(res.body.test.messageId, 'msg-test');
+});
+
+test('POST /channels 重複 alias 回 400', async () => {
+  const app = createApp({
+    bot: fakeBot(),
+    channelLoader: fakeLoader({ news: { channelId: '1' } }),
+    apiKey: 'k',
+    logger: silentLogger,
+  });
+  const res = await request(app)
+    .post('/channels')
+    .set('x-api-key', 'k')
+    .send({ alias: 'news', channelId: '2' });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /already exists/);
+});
+
+test('POST /channels 缺 x-api-key 回 401', async () => {
+  const app = createApp({
+    bot: fakeBot(),
+    channelLoader: fakeLoader({}),
+    apiKey: 'k',
+    logger: silentLogger,
+  });
+  const res = await request(app).post('/channels').send({ alias: 'x', channelId: '1' });
+  assert.equal(res.status, 401);
+});
+
+test('DELETE /channels/:alias 移除回 200', async () => {
+  const map = { news: { channelId: '1' } };
+  const app = createApp({
+    bot: fakeBot(),
+    channelLoader: fakeLoader(map),
+    apiKey: 'k',
+    logger: silentLogger,
+  });
+  const res = await request(app).delete('/channels/news').set('x-api-key', 'k');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal('news' in map, false);
+});
+
+test('DELETE /channels/:alias 不存在回 404', async () => {
+  const app = createApp({
+    bot: fakeBot(),
+    channelLoader: fakeLoader({}),
+    apiKey: 'k',
+    logger: silentLogger,
+  });
+  const res = await request(app).delete('/channels/nope').set('x-api-key', 'k');
+  assert.equal(res.status, 404);
 });
 
 test('頻道無效回 400', async () => {

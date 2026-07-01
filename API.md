@@ -35,6 +35,8 @@ DISCORD_NOTIFY_KEY=<向管理員索取>
 |--------|------|------|--------------|
 | `POST` | `/notify` | 發送一則通知 | ✅ |
 | `GET`  | `/channels` | 列出所有可用頻道 | ✅ |
+| `POST` | `/channels` | 新增頻道 | ✅ |
+| `DELETE` | `/channels/:alias` | 移除頻道 | ✅ |
 | `GET`  | `/health` | 健康檢查 | ❌ |
 
 ---
@@ -88,6 +90,66 @@ curl $DISCORD_NOTIFY_URL/channels -H "x-api-key: $DISCORD_NOTIFY_KEY"
   ]
 }
 ```
+
+---
+
+## `POST /channels` — 新增頻道
+
+程式化新增頻道，直接寫回 `config/channels.json` 並自動熱重載，不需重啟服務或手動改檔。
+
+### 請求參數
+
+| 欄位 | 型別 | 必填 | 說明 |
+|------|------|------|------|
+| `alias` | string | ✅ | 頻道別名（呼叫 `/notify` 時的 key，**不分大小寫**，不可與現有 alias 重複） |
+| `channelId` | string | ✅ | Discord 頻道 ID |
+| `label` | string |  | 顯示名稱，出現在 `/channels` 清單 |
+| `test` | boolean |  | 為 `true` 時新增後立即發一則測試訊息，驗證 Bot 權限 |
+
+```bash
+curl -X POST $DISCORD_NOTIFY_URL/channels \
+  -H "x-api-key: $DISCORD_NOTIFY_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "alias": "news", "channelId": "1521722744566186184", "label": "News", "test": true }'
+```
+
+### 回應
+
+**成功 `201`**
+```json
+{
+  "ok": true,
+  "channel": { "alias": "news", "channelId": "1521722744566186184", "label": "News" },
+  "test": { "ok": true, "messageId": "1521722940843102270" }
+}
+```
+
+> `test` 欄位僅在請求帶 `"test": true` 時出現；若 Bot 未就緒或無該頻道權限，會是 `{ "ok": false, "error": "..." }`，但頻道**仍已新增成功**。
+
+**失敗**
+
+| 狀態碼 | 情境 | 回應範例 |
+|--------|------|----------|
+| `400` | 缺 `alias` / `channelId`，或 alias 已存在 | `{"error":"channel alias already exists: \"news\""}` |
+| `401` | API Key 錯誤或缺失 | `{"error":"unauthorized"}` |
+
+---
+
+## `DELETE /channels/:alias` — 移除頻道
+
+從 `config/channels.json` 移除頻道（**不分大小寫**），自動熱重載。
+
+```bash
+curl -X DELETE $DISCORD_NOTIFY_URL/channels/news -H "x-api-key: $DISCORD_NOTIFY_KEY"
+```
+
+**回應**
+
+| 狀態碼 | 情境 | 回應範例 |
+|--------|------|----------|
+| `200` | 移除成功 | `{"ok":true,"removed":"news"}` |
+| `401` | API Key 錯誤或缺失 | `{"error":"unauthorized"}` |
+| `404` | 該 alias 不存在 | `{"error":"unknown channel: news"}` |
 
 ---
 
@@ -252,9 +314,12 @@ async function safeNotify(body) {
 
 ## 新增 / 修改頻道
 
-1. 請管理員編輯伺服器上的 `config/channels.json`
-2. 存檔後**自動熱重載**，不需重啟服務
-3. 呼叫 `GET /channels` 確認新 alias 已出現
+兩種方式，都會自動熱重載、不需重啟服務：
+
+- **API（推薦，可程式化）**：`POST /channels` 新增、`DELETE /channels/:alias` 移除，詳見上方端點說明
+- **手動**：管理員直接編輯伺服器上的 `config/channels.json`，存檔即生效
+
+新增後可呼叫 `GET /channels` 確認 alias 已出現。
 
 ---
 

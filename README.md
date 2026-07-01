@@ -76,6 +76,24 @@ curl -X POST "$NOTIFY_URL/notify" \
 
 列出所有已登記頻道。需 `x-api-key`。
 
+### `POST /channels`
+
+程式化新增頻道，寫回 `channels.json` 並自動熱重載。需 `x-api-key`。帶 `"test": true` 可在新增後立即發測試訊息。
+
+```bash
+curl -X POST "$NOTIFY_URL/channels" \
+  -H "x-api-key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{ "alias": "news", "channelId": "1521722744566186184", "label": "News", "test": true }'
+```
+
+- `201` 成功，回傳 `{ ok, channel, test? }`
+- `400` 缺 `alias`/`channelId` 或 alias 已存在
+- `401` API Key 錯誤
+
+### `DELETE /channels/:alias`
+
+移除頻道（不分大小寫），自動熱重載。需 `x-api-key`。`200` 成功 / `404` 不存在。
+
 ### `GET /health`
 
 健康檢查，回傳 `{ status, botReady, channelCount }`。**不需**認證。

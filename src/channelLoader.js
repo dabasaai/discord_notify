@@ -1,6 +1,12 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, rename } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import chokidar from 'chokidar';
+
+function badRequest(message) {
+  const err = new Error(message);
+  err.statusCode = 400;
+  return err;
+}
 
 export class ChannelLoader extends EventEmitter {
   constructor(filePath, { logger = console } = {}) {
@@ -60,12 +66,68 @@ export class ChannelLoader extends EventEmitter {
     return this.channels[alias.toLowerCase()];
   }
 
+  async add(alias, { channelId, label } = {}) {
+    if (typeof alias !== 'string' || !alias.trim()) {
+      throw badRequest('alias is required');
+    }
+    if (typeof channelId !== 'string' || !channelId.trim()) {
+      throw badRequest('channelId is required');
+    }
+    const key = alias.toLowerCase();
+    const current = await this.#readRaw();
+    for (const existing of Object.keys(current)) {
+      if (existing.toLowerCase() === key) {
+        throw badRequest(`channel alias already exists: "${existing}"`);
+      }
+    }
+    const entry = { channelId: channelId.trim() };
+    if (label != null && String(label).trim()) entry.label = String(label).trim();
+    current[alias.trim()] = entry;
+    await this.#writeRaw(current);
+    await this.load();
+    return this.get(alias);
+  }
+
+  async remove(alias) {
+    if (typeof alias !== 'string' || !alias.trim()) {
+      throw badRequest('alias is required');
+    }
+    const key = alias.toLowerCase();
+    const current = await this.#readRaw();
+    const foundKey = Object.keys(current).find((k) => k.toLowerCase() === key);
+    if (!foundKey) return false;
+    delete current[foundKey];
+    await this.#writeRaw(current);
+    await this.load();
+    return true;
+  }
+
   list() {
     return Object.values(this.channels).map((v) => ({
       alias: v.originalAlias,
       channelId: v.channelId,
       label: v.label,
     }));
+  }
+
+  async #readRaw() {
+    let raw;
+    try {
+      raw = await readFile(this.filePath, 'utf8');
+    } catch (err) {
+      if (err.code === 'ENOENT') return {};
+      throw err;
+    }
+    if (!raw.trim()) return {};
+    const parsed = JSON.parse(raw);
+    this.#validate(parsed);
+    return parsed;
+  }
+
+  async #writeRaw(obj) {
+    const tmp = `${this.filePath}.tmp`;
+    await writeFile(tmp, `${JSON.stringify(obj, null, 2)}\n`, 'utf8');
+    await rename(tmp, this.filePath);
   }
 
   #validate(obj) {

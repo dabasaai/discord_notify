@@ -20,6 +20,59 @@ export function createApp({ bot, channelLoader, apiKey, logger = console }) {
     res.json({ channels: channelLoader.list() });
   });
 
+  app.post('/channels', auth, async (req, res) => {
+    const { alias, channelId, label, test } = req.body ?? {};
+    let created;
+    try {
+      created = await channelLoader.add(alias, { channelId, label });
+    } catch (err) {
+      if (err.statusCode === 400) {
+        return res.status(400).json({ error: err.message });
+      }
+      logger.error('[channels] add failed', err);
+      return res.status(500).json({ error: 'failed to add channel' });
+    }
+    const result = {
+      ok: true,
+      channel: { alias: created.originalAlias, channelId: created.channelId, label: created.label },
+    };
+    if (test) {
+      if (!bot.isReady()) {
+        result.test = { ok: false, error: 'discord bot not ready' };
+      } else {
+        try {
+          const embed = buildEmbed({
+            title: `頻道測試: ${created.originalAlias}`,
+            level: 'success',
+            message: '頻道已登記，Bot 發送權限正常',
+            service: 'channel-admin',
+          });
+          const sent = await bot.send(created.channelId, { embeds: [embed] });
+          result.test = { ok: true, messageId: sent.id };
+        } catch (err) {
+          result.test = { ok: false, error: err.message };
+        }
+      }
+    }
+    return res.status(201).json(result);
+  });
+
+  app.delete('/channels/:alias', auth, async (req, res) => {
+    try {
+      const removed = await channelLoader.remove(req.params.alias);
+      if (!removed) {
+        return res.status(404).json({ error: `unknown channel: ${req.params.alias}` });
+      }
+      return res.json({ ok: true, removed: req.params.alias });
+    } catch (err) {
+      if (err.statusCode === 400) {
+        return res.status(400).json({ error: err.message });
+      }
+      logger.error('[channels] remove failed', err);
+      return res.status(500).json({ error: 'failed to remove channel' });
+    }
+  });
+
   app.post('/notify', auth, async (req, res) => {
     const { channel, title, level, message, service, fields, mention } = req.body ?? {};
     if (!channel || typeof channel !== 'string') {
