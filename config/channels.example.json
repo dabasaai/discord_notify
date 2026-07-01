@@ -5,5 +5,7 @@
   "officialwebsite": { "channelId": "222222222222222222", "label": "OfficialWebsite" },
   "digitalent_auth": { "channelId": "333333333333333333", "label": "DigitalentAuth" },
   "vault": { "channelId": "444444444444444444", "label": "Vault" },
-  "certs": { "channelId": "555555555555555555", "label": "Certs" }
+  "certs": { "channelId": "555555555555555555", "label": "Certs" },
+  "digitalent_server": { "channelId": "666666666666666666", "label": "DigitalentServer" },
+  "news": { "channelId": "777777777777777777", "label": "News" }
 }
